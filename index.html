@@ -1,893 +1,599 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  LayoutDashboard, 
-  Bike, 
-  DollarSign, 
-  Calendar, 
-  Settings, 
-  Plus, 
-  Trash2, 
-  Download, 
-  Upload, 
-  ShieldCheck, 
-  ChevronRight, 
-  Sun, 
-  Moon, 
-  Award, 
-  Info, 
-  RotateCcw, 
-  Flame, 
-  Target, 
-  TrendingUp, 
-  Clock, 
-  ShoppingBag, 
-  ArrowDownRight, 
-  Smartphone, 
-  Monitor, 
-  CheckCircle2, 
-  AlertTriangle 
-} from 'lucide-react';
 
-const ZEROED_STATE = {
-  shifts: [],
-  maintenance: [],
-  expenses: [],
-  perfumes: [],
-  bikeKm: 0,
-  monthlyGoal: 1500.00,
-  shiftRefDate: '2026-10-17'
-};
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Controle 360">
+<meta name="description" content="Controle sua renda extra, finanças e manutenção da moto.">
+<link rel="manifest" href="./manifest.json">
+<title>Meu Controle 360</title>
 
-const formatBRL = (val) => {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
-};
-
-const formatDateBR = (dateStr) => {
-  if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-');
-  return `${d}/${m}/${y}`;
-};
-
-const getShift12x36 = (dateStr, refDateStr = '2026-10-17') => {
-  const ref = new Date(refDateStr + 'T00:00:00');
-  const target = new Date(dateStr + 'T00:00:00');
-  const diffTime = target.getTime() - ref.getTime();
-  const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
-  return Math.abs(diffDays) % 2 === 0 ? 'PLANTÃO PRODEMGE' : 'FOLGA';
-};
-
-export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [theme, setTheme] = useState('dark');
-  const [showPwaModal, setShowPwaModal] = useState(false);
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [isMobilePreviewMode, setIsMobilePreviewMode] = useState(false); // Toggle frame on desktop
-
-  const [appData, setAppData] = useState(() => {
-    const local = localStorage.getItem('meu_controle_360_data');
-    if (local) {
-      try {
-        return JSON.parse(local);
-      } catch (e) {
-        return ZEROED_STATE;
-      }
-    }
-    return ZEROED_STATE;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('meu_controle_360_data', JSON.stringify(appData));
-  }, [appData]);
-
-  const handleResetData = () => {
-    setAppData(ZEROED_STATE);
-    localStorage.removeItem('meu_controle_360_data');
-    setShowResetModal(false);
-  };
-
-  const metrics = useMemo(() => {
-    const totalGross99 = appData.shifts.filter(s => s.app === '99').reduce((acc, s) => acc + (s.totalGross || 0), 0);
-    const totalGrossIFood = appData.shifts.filter(s => s.app === 'iFood').reduce((acc, s) => acc + (s.totalGross || 0), 0);
-    const totalGrossExtra = totalGross99 + totalGrossIFood;
-    const totalShiftExpenses = appData.shifts.reduce((acc, s) => acc + (s.totalExpenses || 0), 0);
-    const totalNetProfitExtra = totalGrossExtra - totalShiftExpenses;
-    
-    const totalBikeMaintenanceCost = appData.maintenance.reduce((acc, m) => acc + (m.totalCost || 0), 0);
-    const totalHoursWorked = appData.shifts.reduce((acc, s) => acc + (s.durationHours || 0), 0);
-    const totalKmDriven = appData.shifts.reduce((acc, s) => acc + (s.distanceKm || 0), 0);
-
-    const goalProgressPct = appData.monthlyGoal > 0 
-      ? Math.min(100, Math.round((totalNetProfitExtra / appData.monthlyGoal) * 100))
-      : 0;
-
-    return {
-      totalGross99,
-      totalGrossIFood,
-      totalGrossExtra,
-      totalShiftExpenses,
-      totalNetProfitExtra,
-      totalBikeMaintenanceCost,
-      totalHoursWorked,
-      totalKmDriven,
-      goalProgressPct,
-      avgHourlyNet: totalHoursWorked > 0 ? (totalNetProfitExtra / totalHoursWorked) : 0,
-      avgCostPerKm: totalKmDriven > 0 ? (totalShiftExpenses / totalKmDriven) : 0
-    };
-  }, [appData]);
-
-  const runSelfTest = () => {
-    const testShift = { grossEarnings: 100, fuelExpense: 20, foodExpense: 10, durationHours: 4, distanceKm: 50 };
-    const netProfit = testShift.grossEarnings - (testShift.fuelExpense + testShift.foodExpense);
-    const hourly = netProfit / testShift.durationHours;
-    alert(`✅ Diagnóstico OK!\n- Lucro: R$ ${netProfit}\n- Valor/Hora: R$ ${hourly}/h`);
-  };
-
-  return (
-    <div className={`min-h-screen w-full transition-colors duration-200 font-sans flex flex-col justify-start items-center ${
-      theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-200 text-slate-900'
-    }`}>
-
-      {/* TOP DESKTOP HEADER BAR (Visible only on large screens) */}
-      <header className="hidden lg:flex w-full bg-slate-900/90 border-b border-slate-800 px-6 py-2.5 justify-between items-center text-xs">
-        <div className="flex items-center gap-2">
-          <Smartphone className="w-4 h-4 text-emerald-400" />
-          <span className="font-bold text-slate-200">Modo de Visualização Telemóvel (iPhone / Mobile First)</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setIsMobilePreviewMode(!isMobilePreviewMode)}
-            className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-medium transition-all flex items-center gap-1.5"
-          >
-            {isMobilePreviewMode ? <Monitor className="w-3.5 h-3.5 text-teal-400" /> : <Smartphone className="w-3.5 h-3.5 text-emerald-400" />}
-            <span>{isMobilePreviewMode ? 'Expandir Tela Inteira' : 'Ver Moldura Telemóvel'}</span>
-          </button>
-        </div>
-      </header>
-
-      {/* MAIN DEVICE LAYOUT CONTAINER */}
-      <div className={`w-full transition-all duration-300 ${
-        isMobilePreviewMode 
-          ? 'lg:max-w-[420px] lg:my-6 lg:rounded-[48px] lg:border-[10px] lg:border-slate-800 lg:shadow-2xl lg:shadow-emerald-500/10 lg:overflow-hidden lg:ring-1 lg:ring-slate-700' 
-          : 'max-w-2xl'
-      }`}>
-        
-        {/* TELEMÓVEL MOCKUP TOP NOTCH (Visible only in desktop frame mode) */}
-        {isMobilePreviewMode && (
-          <div className="hidden lg:flex justify-center bg-slate-900 pt-2 pb-1">
-            <div className="w-28 h-4 bg-slate-950 rounded-full flex items-center justify-between px-2.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-800" />
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
-            </div>
-          </div>
-        )}
-
-        {/* INNER APP VIEWPORT */}
-        <div className={`min-h-screen lg:min-h-[820px] flex flex-col justify-between ${
-          theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
-        } pb-10`}>
-
-          {/* APP STICKY MOBILE HEADER WITH SIDE-BY-SIDE TABS */}
-          <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/95 border-b border-slate-800 px-3.5 pt-safe-top py-2.5 flex flex-col gap-2.5 shadow-md">
-            <div className="flex justify-between items-center w-full">
-              <div className="flex items-center gap-2">
-                <div className="bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-2 rounded-xl text-slate-950 shadow-md shadow-emerald-500/20">
-                  <Bike className="w-4 h-4 stroke-[2.5]" />
-                </div>
-                <div>
-                  <h1 className="font-black text-base tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 bg-clip-text text-transparent">
-                    Gestão Parfums
-                  </h1>
-                  <p className="text-[10px] text-slate-400 font-medium">Prodemge • 99 • iFood • Parfums</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button 
-                  onClick={() => setShowResetModal(true)}
-                  className="p-1.5 px-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all text-xs flex items-center gap-1 font-semibold active:scale-95"
-                  title="Zerar Sistema"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Zerar</span>
-                </button>
-
-                <button 
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700 active:scale-95"
-                >
-                  {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-slate-400" />}
-                </button>
-              </div>
-            </div>
-
-            {/* TOP NAVIGATION BAR (Horizontal side-by-side tabs at the top) */}
-            <nav className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar pt-1 border-t border-slate-800/60 pb-0.5">
-              <NavButton icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Início" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-              <NavButton icon={<DollarSign className="w-3.5 h-3.5" />} label="Turnos" active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} />
-              <NavButton icon={<Calendar className="w-3.5 h-3.5" />} label="Escala" active={activeTab === 'planning'} onClick={() => setActiveTab('planning')} />
-              <NavButton icon={<Bike className="w-3.5 h-3.5" />} label="Moto" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} />
-              <NavButton icon={<ShoppingBag className="w-3.5 h-3.5" />} label="Parfums" active={activeTab === 'perfumes'} onClick={() => setActiveTab('perfumes')} />
-              <NavButton icon={<Award className="w-3.5 h-3.5" />} label="Opções" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
-            </nav>
-          </header>
-
-          {/* ACTIVE CONTENT VIEW */}
-          <main className="p-3.5 sm:p-4 flex-1">
-            {activeTab === 'dashboard' && (
-              <DashboardView 
-                appData={appData} 
-                metrics={metrics} 
-                setActiveTab={setActiveTab} 
-              />
-            )}
-            {activeTab === 'shifts' && (
-              <ShiftsModule appData={appData} setAppData={setAppData} />
-            )}
-            {activeTab === 'planning' && (
-              <PlanningModule appData={appData} setAppData={setAppData} />
-            )}
-            {activeTab === 'maintenance' && (
-              <MaintenanceModule appData={appData} setAppData={setAppData} />
-            )}
-            {activeTab === 'perfumes' && (
-              <PerfumesModule appData={appData} />
-            )}
-            {activeTab === 'reports' && (
-              <ReportsModule 
-                appData={appData} 
-                runSelfTest={runSelfTest} 
-                setAppData={setAppData} 
-                setShowResetModal={setShowResetModal}
-                setShowPwaModal={setShowPwaModal}
-              />
-            )}
-          </main>
-
-        </div>
-      </div>
-
-      {/* RESET CONFIRMATION MODAL */}
-      {showResetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-slate-200">
-            <div className="flex items-center gap-3 text-rose-500 mb-3">
-              <AlertTriangle className="w-7 h-7" />
-              <h3 className="text-lg font-bold text-slate-100">Zerar Todos os Dados?</h3>
-            </div>
-            <p className="text-xs text-slate-300 mb-6 leading-relaxed">
-              Esta ação limpará turnos, manutenções e registros salvos no aplicativo Gestão Parfums.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button 
-                onClick={() => setShowResetModal(false)}
-                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-xs transition-colors active:scale-95"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleResetData}
-                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-colors shadow-lg active:scale-95"
-              >
-                Sim, Zerar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* PWA iOS INSTALL MODAL */}
-      {showPwaModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-slate-200">
-            <h3 className="text-lg font-bold text-emerald-400 mb-2 flex items-center gap-2">
-              <Download className="w-5 h-5" /> Instalar no iPhone
-            </h3>
-            <p className="text-xs text-slate-300 mb-4">
-              Siga os passos no Safari para adicionar como App:
-            </p>
-            <ol className="list-decimal list-inside space-y-2 text-xs text-slate-300 mb-6 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
-              <li>Abra esta página no <strong>Safari</strong>.</li>
-              <li>Toque no botão <strong>Compartilhar</strong> (ícone com seta).</li>
-              <li>Selecione <strong>"Adicionar à Tela de Início"</strong>.</li>
-            </ol>
-            <button 
-              onClick={() => setShowPwaModal(false)}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl transition-colors active:scale-95 text-xs"
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
-      )}
+<style>
+:root {
+  --bg:#f2f5fa; --card:#fff; --text:#182235; --muted:#6b778b;
+  --primary:#2457d6; --navy:#101827; --green:#14845b;
+  --red:#c33c43; --amber:#a66b08; --border:#e1e7ef;
+}
+* { box-sizing:border-box }
+body {
+  margin:0; background:var(--bg); color:var(--text);
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  padding-bottom:85px;
+}
+header {
+  background:var(--navy); color:white;
+  padding:calc(18px + env(safe-area-inset-top)) 16px 18px;
+}
+.header-inner, main { max-width:1100px; margin:auto }
+.header-inner { display:flex; justify-content:space-between; align-items:center; gap:12px }
+.logo { font-size:21px; font-weight:850 }
+.logo span { color:#78a5ff }
+.subtitle { color:#c0cadb; font-size:12px }
+header button { background:#26334a; color:white; border:1px solid #43506a }
+main { padding:18px 13px }
+h1 { font-size:23px; margin:0 }
+h2 { font-size:17px; margin:0 0 14px }
+p { margin-top:6px }
+button,.btn {
+  border:0; border-radius:11px; background:var(--primary); color:white;
+  font:inherit; font-weight:700; padding:11px 14px; cursor:pointer;
+}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible {
+  outline:2px solid #5685ff; outline-offset:2px;
+}
+.secondary { background:#e9efff; color:#244db5 }
+.ghost { background:transparent; color:var(--text); border:1px solid var(--border) }
+.danger { background:#ffeded; color:var(--red) }
+.tabs { display:flex; gap:7px; overflow-x:auto; padding:0 0 12px }
+.tabs button { white-space:nowrap; background:transparent; color:var(--muted) }
+.tabs button.active { background:#e4ebff; color:#214db9 }
+.grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:11px }
+.two { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px }
+.card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; padding:15px; min-width:0;
+  box-shadow:0 5px 18px #17203308;
+}
+.label { color:var(--muted); font-size:12px; font-weight:650 }
+.metric { font-size:23px; font-weight:850; margin-top:7px; overflow-wrap:anywhere }
+.muted { color:var(--muted) }
+.small { font-size:12px }
+.green { color:var(--green) }
+.red { color:var(--red) }
+.section { margin-top:19px }
+.section-title { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px }
+.formgrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px }
+.field { min-width:0 }
+.field.full { grid-column:1/-1 }
+label { display:block; font-size:12px; font-weight:700; margin-bottom:5px; color:var(--muted) }
+input,select,textarea {
+  width:100%; min-width:0; border:1px solid #d7deea; border-radius:10px;
+  background:var(--card); color:var(--text); padding:11px;
+  font:inherit;
+}
+textarea { min-height:70px; resize:vertical }
+.actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:13px }
+.progress { height:8px; border-radius:20px; background:#e7ebf2; overflow:hidden; margin:9px 0 }
+.progress span { display:block; height:100%; background:var(--green) }
+.pill { display:inline-block; border-radius:20px; padding:3px 8px; font-size:11px; background:#edf1f6 }
+.warning { background:#fff4dc; color:#865400; padding:12px; border-radius:12px; font-size:12px; margin-bottom:14px }
+.tablewrap { overflow-x:auto }
+table { border-collapse:collapse; width:100%; font-size:12px }
+th,td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--border); white-space:nowrap }
+th { color:var(--muted); text-transform:uppercase; font-size:10px }
+.smallbtn { font-size:11px; padding:7px 9px; margin:2px }
+.empty { text-align:center; padding:20px; color:var(--muted) }
+.barline { display:grid; grid-template-columns:60px 1fr 90px; gap:8px; align-items:center; margin:12px 0; font-size:12px }
+.bar { background:#e8edf5; border-radius:10px; overflow:hidden; height:9px }
+.bar span { display:block; height:100%; background:#3568e9 }
+.page.hidden { display:none }
+nav {
+  position:fixed; bottom:0; left:0; right:0; z-index:5;
+  display:flex; justify-content:space-around; gap:2px;
+  padding:8px 4px calc(8px + env(safe-area-inset-bottom));
+  background:var(--card); border-top:1px solid var(--border);
+}
+nav button {
+  background:transparent; color:var(--muted); font-size:10px;
+  padding:6px 5px; min-width:0; flex:1;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+}
+nav button span { font-size:19px }
+nav button.active { color:var(--primary) }
+.toast {
+  position:fixed; bottom:90px; left:5%; width:90%; z-index:10;
+  background:var(--navy); color:white; padding:13px;
+  border-radius:12px; text-align:center;
+}
+body.dark {
+  --bg:#0c1220; --card:#151e2e; --text:#eaf0fa; --muted:#a5b1c4;
+  --border:#2a3548;
+}
+body.dark input,body.dark select,body.dark textarea { border-color:#34425a }
+body.dark .secondary { background:#26395e; color:#e0e9ff }
+body.dark .tabs button.active { background:#26395e; color:#e0e9ff }
+@media(max-width:760px) {
+  .grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px }
+  .two { grid-template-columns:1fr }
+  .metric { font-size:20px }
+  .card { padding:13px }
+  .formgrid { grid-template-columns:1fr }
+  .field.full { grid-column:auto }
+}
+@media(min-width:761px) {
+  body { padding-bottom:20px }
+  nav { position:static; max-width:1100px; margin:0 auto 12px; border:1px solid var(--border); border-radius:14px }
+  nav button { flex-direction:row; font-size:13px }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <div>
+      <div class="logo">Meu Controle <span>360</span></div>
+      <div class="subtitle">Renda extra · Finanças · Motocicleta</div>
     </div>
-  );
-}
-
-function NavButton({ icon, label, active, onClick }) {
-  return (
-    <button 
-      onClick={onClick}
-      className={`flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl transition-all active:scale-95 touch-manipulation whitespace-nowrap text-xs ${
-        active 
-          ? 'bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30 shadow-sm' 
-          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-      }`}
-    >
-      {icon}
-      <span className="tracking-tight">{label}</span>
-    </button>
-  );
-}
-
-function DashboardView({ appData, metrics, setActiveTab }) {
-  const todayStr = new Date().toISOString().split('T')[0];
-  const shiftToday = getShift12x36(todayStr, appData.shiftRefDate);
-
-  return (
-    <div className="space-y-3.5">
-      {/* STATUS HERO CARD */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-4 shadow-xl relative overflow-hidden">
-        <div className="flex flex-col gap-3">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Status de Hoje</span>
-              <span className="text-[10px] text-slate-500">• {formatDateBR(todayStr)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-black text-slate-100">
-                {shiftToday.includes('PLANTÃO') ? 'Dia de Plantão' : 'Dia Livre'}
-              </h2>
-              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide border ${
-                shiftToday.includes('PLANTÃO') 
-                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' 
-                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-              }`}>
-                {shiftToday}
-              </span>
-            </div>
-          </div>
-
-          <button 
-            onClick={() => setActiveTab('shifts')}
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 text-xs"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>Lançar Turno</span>
-          </button>
-        </div>
-      </div>
-
-      {/* GOAL CARD */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
-        <div className="flex justify-between items-start mb-2">
-          <div>
-            <div className="flex items-center gap-1 mb-0.5">
-              <Target className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Meta do Mês</span>
-            </div>
-            <h3 className="text-2xl font-black text-emerald-400">
-              {formatBRL(metrics.totalNetProfitExtra)}
-            </h3>
-          </div>
-          <div className="text-right bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
-            <span className="text-xl font-black text-slate-100">{metrics.goalProgressPct}%</span>
-          </div>
-        </div>
-
-        <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden my-2.5 p-0.5 border border-slate-800">
-          <div 
-            className="bg-gradient-to-r from-teal-400 via-emerald-400 to-emerald-500 h-full rounded-full transition-all duration-500"
-            style={{ width: `${metrics.goalProgressPct}%` }}
-          />
-        </div>
-
-        <div className="flex justify-between items-center text-[11px] text-slate-400">
-          <span>Meta: <strong className="text-slate-200">{formatBRL(appData.monthlyGoal)}</strong></span>
-          <span className="text-emerald-400 font-bold">{metrics.goalProgressPct >= 100 ? '🎉 Meta Atingida!' : 'Em progresso'}</span>
-        </div>
-      </div>
-
-      {/* METRICS GRID */}
-      <div className="grid grid-cols-2 gap-2.5">
-        <KpiCard title="Ganhos 99" value={formatBRL(metrics.totalGross99)} color="emerald" icon={<DollarSign className="w-3.5 h-3.5" />} />
-        <KpiCard title="Ganhos iFood" value={formatBRL(metrics.totalGrossIFood)} color="teal" icon={<DollarSign className="w-3.5 h-3.5" />} />
-        <KpiCard title="Despesas" value={formatBRL(metrics.totalShiftExpenses)} color="rose" icon={<ArrowDownRight className="w-3.5 h-3.5" />} />
-        <KpiCard title="Lucro Real" value={formatBRL(metrics.totalNetProfitExtra)} color="amber" icon={<Flame className="w-3.5 h-3.5" />} />
-      </div>
-
-      {/* RECENT SHIFTS */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-emerald-400" /> Últimos Turnos
-          </h3>
-          <button onClick={() => setActiveTab('shifts')} className="text-[11px] text-emerald-400 font-bold hover:underline">
-            Ver Todos
-          </button>
-        </div>
-
-        {appData.shifts.length === 0 ? (
-          <p className="text-xs text-slate-500 text-center py-4">Nenhum turno cadastrado ainda.</p>
-        ) : (
-          <div className="space-y-2">
-            {appData.shifts.slice(-2).reverse().map((shift) => (
-              <div key={shift.id} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 flex justify-between items-center text-xs">
-                <div>
-                  <span className="font-bold text-slate-200">{formatDateBR(shift.date)}</span>
-                  <span className={`ml-2 px-1.5 py-0.2 text-[9px] rounded font-extrabold ${shift.app === '99' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                    {shift.app}
-                  </span>
-                </div>
-                <span className="font-black text-emerald-400">{formatBRL(shift.netProfit)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+    <div class="actions" style="margin:0">
+      <button id="themeBtn" aria-label="Alternar tema">◐</button>
+      <button id="backupBtn">Backup</button>
     </div>
-  );
-}
+  </div>
+</header>
 
-function KpiCard({ title, value, color, icon }) {
-  const colorMap = {
-    emerald: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5',
-    teal: 'text-teal-400 border-teal-500/20 bg-teal-500/5',
-    rose: 'text-rose-400 border-rose-500/20 bg-rose-500/5',
-    amber: 'text-amber-400 border-amber-500/20 bg-amber-500/5',
-  };
+<main>
+  <div class="warning" id="storageNotice">
+    Dados armazenados neste navegador. Exporte backups regularmente.
+    A sincronização com Supabase ainda não está configurada.
+  </div>
 
-  return (
-    <div className={`border rounded-2xl p-3 shadow-sm ${colorMap[color]}`}>
-      <div className="flex justify-between items-center mb-1">
-        <span className="text-[10px] text-slate-400 font-bold uppercase">{title}</span>
-        {icon}
-      </div>
-      <p className={`text-lg font-black ${colorMap[color].split(' ')[0]}`}>{value}</p>
+  <div class="tabs">
+    <button class="active" data-page="dashboard">Visão geral</button>
+    <button data-page="turnos">Renda extra</button>
+    <button data-page="moto">Minha moto</button>
+    <button data-page="despesas">Despesas</button>
+    <button data-page="envelopes">Envelopes</button>
+    <button data-page="metas">Metas</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="page">
+    <div class="section-title">
+      <div><h1>Visão geral</h1><p class="muted small" id="today"></p></div>
+      <button onclick="go('turnos')">+ Novo turno</button>
     </div>
-  );
-}
 
-function ShiftsModule({ appData, setAppData }) {
-  const [form, setForm] = useState({
-    date: new Date().toISOString().split('T')[0],
-    app: '99',
-    startTime: '08:00',
-    endTime: '12:00',
-    startKm: appData.bikeKm || 0,
-    endKm: (appData.bikeKm || 0) + 50,
-    grossEarnings: '',
-    fuelExpense: 0,
-    foodExpense: 0,
-    otherExpense: 0
-  });
+    <div class="grid">
+      <div class="card"><div class="label">Lucro operacional</div><div class="metric green" id="dProfit">R$ 0,00</div><div class="small muted">99 + iFood</div></div>
+      <div class="card"><div class="label">Receita bruta</div><div class="metric" id="dGross">R$ 0,00</div><div class="small muted">Turnos registrados</div></div>
+      <div class="card"><div class="label">Despesas gerais</div><div class="metric red" id="dExpenses">R$ 0,00</div><div class="small muted">Lançamentos cadastrados</div></div>
+      <div class="card"><div class="label">Manutenção da moto</div><div class="metric" id="dMaintenance">R$ 0,00</div><div class="small muted">Histórico de serviços</div></div>
+      <div class="card"><div class="label">Meta mensal</div><div class="metric" id="dGoal">0%</div><div class="progress"><span id="dGoalBar"></span></div><div class="small muted" id="dGoalText"></div></div>
+      <div class="card"><div class="label">Fundo Paraguai</div><div class="metric" id="dTrip">R$ 0,00</div><div class="small muted">Saldo reservado</div></div>
+      <div class="card"><div class="label">Capital perfumes</div><div class="metric" id="dPerfume">R$ 0,00</div><div class="small muted">Saldo reservado</div></div>
+      <div class="card"><div class="label">Próxima manutenção</div><div class="metric" id="dNext">—</div><div class="small muted" id="dNextText">Sem previsão cadastrada</div></div>
+    </div>
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const [startH, startM] = form.startTime.split(':').map(Number);
-    const [endH, endM] = form.endTime.split(':').map(Number);
-    let durationHours = (endH + endM / 60) - (startH + startM / 60);
-    if (durationHours <= 0) durationHours += 24;
+    <div class="section two">
+      <div class="card"><h2>Lucro por aplicativo</h2><div id="platformChart"></div></div>
+      <div class="card"><h2>Resumo</h2><p id="dCounts" class="muted small"></p><hr><p class="small muted">O salário da Prodemge não é somado à renda extra. O lucro operacional dos aplicativos é separado das despesas pessoais.</p><button class="secondary" onclick="exportCSV()">Exportar turnos CSV</button></div>
+    </div>
+  </section>
 
-    const startKmNum = Number(form.startKm) || 0;
-    const endKmNum = Number(form.endKm) || 0;
-    const distanceKm = Math.max(0, endKmNum - startKmNum);
-
-    const grossEarningsNum = Number(form.grossEarnings) || 0;
-    const fuelExpenseNum = Number(form.fuelExpense) || 0;
-    const foodExpenseNum = Number(form.foodExpense) || 0;
-    const otherExpenseNum = Number(form.otherExpense) || 0;
-
-    const totalGross = grossEarningsNum;
-    const totalExpenses = fuelExpenseNum + foodExpenseNum + otherExpenseNum;
-    const netProfit = totalGross - totalExpenses;
-
-    const newShift = {
-      id: 'shift_' + Date.now(),
-      ...form,
-      startKm: startKmNum,
-      endKm: endKmNum,
-      grossEarnings: grossEarningsNum,
-      fuelExpense: fuelExpenseNum,
-      foodExpense: foodExpenseNum,
-      otherExpense: otherExpenseNum,
-      durationHours: Number(durationHours.toFixed(2)),
-      distanceKm,
-      totalGross,
-      totalExpenses,
-      netProfit
-    };
-
-    setAppData(prev => ({
-      ...prev,
-      shifts: [...prev.shifts, newShift],
-      bikeKm: Math.max(prev.bikeKm || 0, endKmNum)
-    }));
-
-    setForm(prev => ({ ...prev, grossEarnings: '', fuelExpense: 0, foodExpense: 0, otherExpense: 0 }));
-    alert('Turno registrado!');
-  };
-
-  const iosInputClass = "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-base text-slate-100 focus:outline-none focus:border-emerald-500";
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
-        <h2 className="text-sm font-bold text-slate-100 mb-3 flex items-center gap-2">
-          <Plus className="w-4 h-4 text-emerald-400" /> Registrar Turno
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">Data</label>
-            <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className={iosInputClass} required />
+  <!-- TURNOS -->
+  <section id="turnos" class="page hidden">
+    <h1>Renda extra</h1><p class="muted small">Cadastre cada turno realizado.</p>
+    <div class="section two">
+      <div class="card">
+        <h2 id="turnTitle">Registrar turno</h2>
+        <form id="turnForm">
+          <input type="hidden" id="turnId">
+          <div class="formgrid">
+            <div class="field"><label>Data</label><input id="tDate" type="date" required></div>
+            <div class="field"><label>Aplicativo</label><select id="tApp"><option>99</option><option>iFood</option></select></div>
+            <div class="field"><label>Horário inicial</label><input id="tStart" type="time" required></div>
+            <div class="field"><label>Horário final</label><input id="tEnd" type="time" required></div>
+            <div class="field"><label>KM inicial</label><input id="tKmStart" type="number" min="0" step=".1" required inputmode="decimal"></div>
+            <div class="field"><label>KM final</label><input id="tKmEnd" type="number" min="0" step=".1" required inputmode="decimal"></div>
+            <div class="field"><label>Ganhos de corridas/entregas (R$)</label><input id="tBase" type="number" min="0" step=".01" value="0" required></div>
+            <div class="field"><label>Gorjetas (R$)</label><input id="tTips" type="number" min="0" step=".01" value="0"></div>
+            <div class="field"><label>Bônus (R$)</label><input id="tBonus" type="number" min="0" step=".01" value="0"></div>
+            <div class="field"><label>Combustível atribuído (R$)</label><input id="tFuel" type="number" min="0" step=".01" value="0"></div>
+            <div class="field"><label>Alimentação (R$)</label><input id="tFood" type="number" min="0" step=".01" value="0"></div>
+            <div class="field"><label>Outras despesas (R$)</label><input id="tOther" type="number" min="0" step=".01" value="0"></div>
+            <div class="field full"><label>Observações</label><textarea id="tNotes"></textarea></div>
           </div>
+          <p id="turnCalc" class="small muted"></p>
+          <div class="actions"><button type="submit">Salvar turno</button><button type="button" class="ghost" id="clearTurn">Limpar</button></div>
+        </form>
+      </div>
+      <div class="card"><h2>Resumo por aplicativo</h2><div id="appSummary"></div><hr><p class="small muted">Não registre novamente como despesa geral o combustível já atribuído ao turno, a menos que queira controlar o desembolso separadamente e saiba evitar a duplicação dos totais.</p></div>
+    </div>
+    <div class="section card"><h2>Histórico de turnos</h2><div class="tablewrap"><table><thead><tr><th>Data</th><th>App</th><th>Horas</th><th>KM</th><th>Bruto</th><th>Despesas</th><th>Líquido</th><th>Ações</th></tr></thead><tbody id="turnRows"></tbody></table></div></div>
+  </section>
 
-          <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">Aplicativo</label>
-            <select value={form.app} onChange={e => setForm({...form, app: e.target.value})} className={iosInputClass}>
-              <option value="99">99 Motorista</option>
-              <option value="iFood">iFood Entregas</option>
-            </select>
+  <!-- MOTO -->
+  <section id="moto" class="page hidden">
+    <h1>Minha moto</h1><p class="muted small">Veículo, manutenção e durabilidade das peças.</p>
+    <div class="section two">
+      <div class="card">
+        <h2>Dados da motocicleta</h2>
+        <form id="bikeForm"><div class="formgrid">
+          <div class="field"><label>Marca e modelo</label><input id="bModel" placeholder="Ex.: Honda CG 160"></div>
+          <div class="field"><label>Ano</label><input id="bYear" type="number" min="1900" max="2100"></div>
+          <div class="field"><label>Placa (opcional)</label><input id="bPlate" maxlength="10"></div>
+          <div class="field"><label>Quilometragem atual</label><input id="bKm" type="number" min="0" step=".1" value="20000" required></div>
+        </div><div class="actions"><button>Salvar veículo</button></div></form>
+      </div>
+      <div class="card">
+        <h2>Registrar manutenção</h2>
+        <form id="maintForm"><input type="hidden" id="mId">
+          <div class="formgrid">
+            <div class="field"><label>Categoria</label><select id="mCategory"><option>Pneu traseiro</option><option>Pneu dianteiro</option><option>Óleo do motor</option><option>Filtro</option><option>Relação / corrente</option><option>Freios</option><option>Bateria</option><option>Velas</option><option>Suspensão</option><option>Revisão</option><option>Outra</option></select></div>
+            <div class="field"><label>Peça ou serviço</label><input id="mName" required></div>
+            <div class="field"><label>Data da instalação</label><input id="mDate" type="date" required></div>
+            <div class="field"><label>KM da instalação</label><input id="mKm" type="number" min="0" step=".1" required></div>
+            <div class="field"><label>Valor da peça (R$)</label><input id="mPart" type="number" min="0" step=".01" value="0"></div>
+            <div class="field"><label>Mão de obra (R$)</label><input id="mLabor" type="number" min="0" step=".01" value="0"></div>
+            <div class="field"><label>Vida útil estimada (km)</label><input id="mLifeKm" type="number" min="0"></div>
+            <div class="field"><label>Vida útil estimada (meses)</label><input id="mLifeMonths" type="number" min="0"></div>
+            <div class="field"><label>Oficina/fornecedor</label><input id="mSupplier"></div>
+            <div class="field"><label>Próxima revisão</label><input id="mNextDate" type="date"></div>
+            <div class="field full"><label>Observações</label><textarea id="mNotes"></textarea></div>
           </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[11px] text-slate-400 mb-1 block">Início / Fim</label>
-              <input type="time" value={form.startTime} onChange={e => setForm({...form, startTime: e.target.value})} className={iosInputClass} />
-            </div>
-            <div>
-              <label className="text-[11px] text-slate-400 mb-1 block">&nbsp;</label>
-              <input type="time" value={form.endTime} onChange={e => setForm({...form, endTime: e.target.value})} className={iosInputClass} />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">Ganhos Brutos (R$)</label>
-            <input type="number" step="0.01" value={form.grossEarnings} onChange={e => setForm({...form, grossEarnings: e.target.value})} className={`${iosInputClass} font-bold text-emerald-400`} required />
-          </div>
-
-          <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-3 rounded-xl transition-all text-xs active:scale-95">
-            Salvar Registro
-          </button>
+          <div class="actions"><button>Salvar manutenção</button><button type="button" class="ghost" id="clearMaint">Limpar</button></div>
         </form>
       </div>
     </div>
-  );
-}
+    <div class="section card"><h2>Histórico técnico</h2><div class="tablewrap"><table><thead><tr><th>Data</th><th>Peça</th><th>KM</th><th>Custo</th><th>Durabilidade</th><th>Custo/1.000 km</th><th>Ações</th></tr></thead><tbody id="maintRows"></tbody></table></div><p class="small muted">Peças em uso apresentam durabilidade parcial até a quilometragem atual. O ciclo anterior é estimado a partir do próximo registro da mesma categoria. Revise os registros para garantir que se trata da mesma peça.</p></div>
+  </section>
 
-function PlanningModule({ appData, setAppData }) {
-  const [refDate, setRefDate] = useState(appData.shiftRefDate || '2026-10-17');
+  <!-- DESPESAS -->
+  <section id="despesas" class="page hidden">
+    <h1>Despesas e orçamento</h1><p class="muted small">Contas pagas, pendentes e gastos pessoais.</p>
+    <div class="section two">
+      <div class="card"><h2>Nova despesa</h2>
+        <form id="expenseForm"><input type="hidden" id="eId"><div class="formgrid">
+          <div class="field"><label>Data</label><input id="eDate" type="date" required></div>
+          <div class="field"><label>Descrição</label><input id="eDesc" required></div>
+          <div class="field"><label>Categoria</label><select id="eCategory"><option>Despesas pessoais</option><option>Contas domésticas</option><option>Combustível</option><option>Alimentação em serviço</option><option>Manutenção da moto</option><option>Documentação e seguros</option><option>Saúde</option><option>Transporte</option><option>Lazer</option><option>Compras Parfums Selection</option><option>Viagem ao Paraguai</option><option>Reserva de emergência</option><option>Outras</option></select></div>
+          <div class="field"><label>Valor (R$)</label><input id="eValue" type="number" min=".01" step=".01" required></div>
+          <div class="field"><label>Vencimento</label><input id="eDue" type="date"></div>
+          <div class="field"><label>Status</label><select id="eStatus"><option>Pendente</option><option>Pago</option></select></div>
+          <div class="field"><label>Origem</label><select id="eOrigin"><option>Pessoal</option><option>99</option><option>iFood</option><option>Parfums Selection</option></select></div>
+          <div class="field"><label>Pagamento</label><select id="ePayment"><option>Pix</option><option>Débito</option><option>Crédito</option><option>Dinheiro</option><option>Boleto</option><option>Outro</option></select></div>
+          <div class="field full"><label>Observações</label><textarea id="eNotes"></textarea></div>
+        </div><div class="actions"><button>Salvar despesa</button><button type="button" class="ghost" id="clearExpense">Limpar</button></div></form>
+      </div>
+      <div class="card"><h2>Totais</h2><div class="label">Total cadastrado</div><div class="metric red" id="eTotal">R$ 0,00</div><hr><div class="label">Contas pendentes</div><div class="metric" id="ePending">R$ 0,00</div></div>
+    </div>
+    <div class="section card"><h2>Histórico de despesas</h2><div class="tablewrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Origem</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="expenseRows"></tbody></table></div></div>
+  </section>
 
-  const daysList = useMemo(() => {
-    const list = [];
-    const start = new Date();
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
-      const status = getShift12x36(dateStr, refDate);
-      list.push({ dateStr, status });
-    }
-    return list;
-  }, [refDate]);
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
-        <h2 className="text-sm font-bold text-slate-100 mb-3 flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-emerald-400" /> Escala 12x36 Prodemge
-        </h2>
-
-        <div className="space-y-2">
-          {daysList.map((item, idx) => {
-            const isPlantao = item.status.includes('PLANTÃO');
-            return (
-              <div key={idx} className={`p-3 rounded-xl border flex justify-between items-center text-xs ${
-                isPlantao ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
-              }`}>
-                <div>
-                  <span className="font-bold">{formatDateBR(item.dateStr)}</span>
-                  <p className="text-[10px] text-slate-400">{isPlantao ? 'Plantão Prodemge' : 'Folga Livre'}</p>
-                </div>
-                <span className="font-black text-[10px] px-2 py-1 rounded bg-slate-950 border border-slate-800">
-                  {isPlantao ? 'PRODEMGE' : 'LIVRE P/ 99'}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+  <!-- ENVELOPES -->
+  <section id="envelopes" class="page hidden">
+    <h1>Envelopes financeiros</h1><p class="muted small">Distribua o dinheiro líquido entre os objetivos.</p>
+    <div class="section two">
+      <div class="card"><h2>Distribuir dinheiro</h2><form id="allocForm">
+        <div class="field"><label>Valor líquido disponível (R$)</label><input id="aAmount" type="number" min=".01" step=".01" required></div>
+        <p class="small muted">A soma dos percentuais precisa ser exatamente 100%.</p>
+        <div class="formgrid" id="percentFields"></div>
+        <div class="actions"><button type="button" class="secondary" id="previewAlloc">Prévia</button><button>Confirmar distribuição</button></div>
+        <div id="allocPreview" class="small"></div>
+      </form></div>
+      <div class="card"><h2>Saldos</h2><div id="envelopeCards"></div><hr>
+        <h2>Ajuste manual</h2>
+        <div class="field"><label>Envelope</label><select id="adjName"></select></div>
+        <div class="field" style="margin-top:10px"><label>Valor (negativo para retirada)</label><input id="adjValue" type="number" step=".01"></div>
+        <div class="actions"><button id="applyAdjust">Registrar ajuste</button></div>
       </div>
     </div>
-  );
-}
+    <div class="section card"><h2>Histórico de movimentações</h2><div class="tablewrap"><table><thead><tr><th>Data</th><th>Tipo</th><th>Envelope</th><th>Valor</th></tr></thead><tbody id="allocRows"></tbody></table></div></div>
+  </section>
 
-function MaintenanceModule({ appData, setAppData }) {
-  const [form, setForm] = useState({
-    item: '',
-    cost: '',
-    date: new Date().toISOString().split('T')[0],
-    category: 'Manutenção Preventiva',
-    durabilityKm: '',
-    durabilityDays: '',
-    notes: ''
-  });
+  <!-- METAS -->
+  <section id="metas" class="page hidden">
+    <h1>Metas financeiras</h1><p class="muted small">Acompanhe sua renda extra e objetivos de capital.</p>
+    <div class="section two">
+      <div class="card"><h2>Meta mensal de renda extra</h2><form id="goalForm"><div class="field"><label>Meta líquida (R$)</label><input id="goalAmount" type="number" min="1" step=".01" required></div><div class="actions"><button>Salvar meta</button></div></form><hr><div class="metric" id="goalValue">R$ 0,00</div><div class="small muted">Lucro operacional no mês atual</div><div class="progress"><span id="goalBar"></span></div><p id="goalText" class="small muted"></p></div>
+      <div class="card"><h2>Objetivos de capital</h2><form id="targetForm">
+        <div class="field"><label>Objetivo</label><select id="targetName"><option>Viagem ao Paraguai</option><option>Capital para perfumes</option><option>Reserva de emergência</option><option>Manutenção da moto</option></select></div>
+        <div class="field" style="margin-top:10px"><label>Valor-alvo (R$)</label><input id="targetAmount" type="number" min="1" step=".01" required></div>
+        <div class="field" style="margin-top:10px"><label>Prazo desejado</label><input id="targetDate" type="date"></div>
+        <div class="actions"><button>Salvar objetivo</button></div>
+      </form><div id="targetList"></div></div>
+    </div>
+  </section>
+</main>
 
-  const [currentKm, setCurrentKm] = useState(appData.bikeKm || 0);
+<nav>
+  <button class="active" data-page="dashboard"><span>⌂</span>Início</button>
+  <button data-page="turnos"><span>◷</span>Renda extra</button>
+  <button data-page="moto"><span>⚙</span>Minha moto</button>
+  <button data-page="despesas"><span>▤</span>Despesas</button>
+  <button data-page="envelopes"><span>◉</span>Envelopes</button>
+  <button data-page="metas"><span>◎</span>Metas</button>
+</nav>
+<div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
 
-  const handleUpdateKm = (e) => {
-    e.preventDefault();
-    const newKm = Number(currentKm) || 0;
-    setAppData(prev => ({
-      ...prev,
-      bikeKm: newKm
-    }));
-    alert('Odômetro atualizado com sucesso!');
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const today = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   };
+  const money = n => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n)||0);
+  const dateBR = s => s ? new Date(s+'T12:00:00').toLocaleDateString('pt-BR') : '—';
+  const number = id => Number($(id).value)||0;
+  const value = id => $(id).value;
+  const id = () => crypto.randomUUID ? crypto.randomUUID() : Date.now()+'-'+Math.random().toString(16).slice(2);
+  const envelopeNames = ['Complemento salarial','Reserva manutenção moto','Fundo viagem Paraguai','Capital perfumes','Reserva de emergência'];
+  const defaultPercents = [40,15,20,15,10];
+  let toastTimer;
+  let db = load();
 
-  const handleAddMaintenance = (e) => {
+  function load() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('mc360_db') || '{}');
+      return {
+        turns:[], maintenance:[], expenses:[], allocations:[], targets:[],
+        envelopes:Object.fromEntries(envelopeNames.map(n=>[n,0])),
+        goal:1500, bike:{model:'',year:'',plate:'',km:20000}, ...saved,
+        envelopes:{...Object.fromEntries(envelopeNames.map(n=>[n,0])),...(saved.envelopes||{})},
+        bike:{model:'',year:'',plate:'',km:20000,...(saved.bike||{})}
+      };
+    } catch {
+      return {turns:[],maintenance:[],expenses:[],allocations:[],targets:[],envelopes:{},goal:1500,bike:{km:0}};
+    }
+  }
+  function save() {
+    try { localStorage.setItem('mc360_db',JSON.stringify(db)); render(); }
+    catch { notify('Não foi possível salvar. Exporte o backup e verifique o espaço disponível.'); }
+  }
+  function notify(message) {
+    const t=$('toast'); t.textContent=message; t.hidden=false;
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.hidden=true,3000);
+  }
+  function go(page) {
+    document.querySelectorAll('.page').forEach(p=>p.classList.toggle('hidden',p.id!==page));
+    document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  window.go=go;
+  document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.page)));
+  $('today').textContent=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  ['tDate','mDate','eDate'].forEach(k=>$(k).value=today());
+
+  function duration(t) {
+    const [sh,sm]=t.start.split(':').map(Number),[eh,em]=t.end.split(':').map(Number);
+    let mins=eh*60+em-(sh*60+sm); if(mins<0)mins+=1440; return mins/60;
+  }
+  const gross=t=>(+t.base||0)+(+t.tips||0)+(+t.bonus||0);
+  const costs=t=>(+t.fuel||0)+(+t.food||0)+(+t.other||0);
+  const net=t=>gross(t)-costs(t);
+  const distance=t=>Math.max(0,(+t.kmEnd||0)-(+t.kmStart||0));
+  const monthNow=()=>today().slice(0,7);
+  const currentMonth=s=>(s||'').slice(0,7)===monthNow();
+
+  // TURNOS
+  function resetTurn() {
+    $('turnForm').reset(); $('turnId').value=''; $('tDate').value=today();
+    ['tBase','tTips','tBonus','tFuel','tFood','tOther'].forEach(k=>$(k).value=0);
+    $('turnTitle').textContent='Registrar turno'; $('turnCalc').textContent='';
+  }
+  $('clearTurn').onclick=resetTurn;
+  function calcTurn() {
+    if(!value('tStart')||!value('tEnd')) return;
+    const t={start:value('tStart'),end:value('tEnd'),kmStart:number('tKmStart'),kmEnd:number('tKmEnd'),
+      base:number('tBase'),tips:number('tTips'),bonus:number('tBonus'),fuel:number('tFuel'),food:number('tFood'),other:number('tOther')};
+    const h=duration(t),km=distance(t);
+    $('turnCalc').textContent=`Duração ${h.toFixed(2)} h · Distância ${km.toFixed(1)} km · Bruto ${money(gross(t))} · Despesas ${money(costs(t))} · Líquido ${money(net(t))} · Líquido/h ${money(h?net(t)/h:0)} · Custo/km ${money(km?costs(t)/km:0)}`;
+  }
+  ['tStart','tEnd','tKmStart','tKmEnd','tBase','tTips','tBonus','tFuel','tFood','tOther'].forEach(k=>$(k).addEventListener('input',calcTurn));
+  $('turnForm').onsubmit=e=>{
     e.preventDefault();
-    if (!form.item || !form.cost) return;
-
-    const costNum = Number(form.cost) || 0;
-    const durKmNum = form.durabilityKm ? Number(form.durabilityKm) : null;
-    const durDaysNum = form.durabilityDays ? Number(form.durabilityDays) : null;
-
-    const newRecord = {
-      id: 'maint_' + Date.now(),
-      item: form.item,
-      cost: costNum,
-      date: form.date,
-      category: form.category,
-      durabilityKm: durKmNum,
-      durabilityDays: durDaysNum,
-      notes: form.notes,
-      installedAtKm: appData.bikeKm || 0
+    const edit=value('turnId'),t={
+      id:edit||id(),date:value('tDate'),app:value('tApp'),start:value('tStart'),end:value('tEnd'),
+      kmStart:number('tKmStart'),kmEnd:number('tKmEnd'),base:number('tBase'),tips:number('tTips'),
+      bonus:number('tBonus'),fuel:number('tFuel'),food:number('tFood'),other:number('tOther'),
+      notes:value('tNotes'),updatedAt:new Date().toISOString()
     };
+    if(t.kmEnd<=t.kmStart){notify('A quilometragem final precisa ser maior que a inicial.');return;}
+    if(edit)db.turns=db.turns.map(x=>x.id===edit?t:x); else db.turns.push(t);
+    resetTurn();save();notify('Turno salvo.');
+  };
+  window.editTurn=key=>{
+    const t=db.turns.find(x=>x.id===key); if(!t)return; go('turnos');
+    const map={turnId:'id',tDate:'date',tApp:'app',tStart:'start',tEnd:'end',tKmStart:'kmStart',tKmEnd:'kmEnd',tBase:'base',tTips:'tips',tBonus:'bonus',tFuel:'fuel',tFood:'food',tOther:'other',tNotes:'notes'};
+    Object.entries(map).forEach(([a,b])=>$(a).value=t[b]??'');
+    $('turnTitle').textContent='Editar turno';calcTurn();
+  };
+  window.deleteTurn=key=>{
+    if(confirm('Excluir este turno?')){db.turns=db.turns.filter(t=>t.id!==key);save();notify('Turno excluído.');}
+  };
+  function renderTurns() {
+    $('turnRows').innerHTML=db.turns.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(t=>`<tr>
+      <td>${dateBR(t.date)}</td><td>${t.app}</td><td>${duration(t).toFixed(1)} h</td><td>${distance(t).toFixed(1)}</td>
+      <td>${money(gross(t))}</td><td>${money(costs(t))}</td><td>${money(net(t))}</td>
+      <td><button class="smallbtn secondary" onclick="editTurn('${t.id}')">Editar</button><button class="smallbtn danger" onclick="deleteTurn('${t.id}')">Excluir</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">Nenhum turno cadastrado.</td></tr>';
+    $('appSummary').innerHTML=['99','iFood'].map(app=>{
+      const a=db.turns.filter(t=>t.app===app),g=a.reduce((s,t)=>s+gross(t),0),c=a.reduce((s,t)=>s+costs(t),0),h=a.reduce((s,t)=>s+duration(t),0);
+      return `<div class="section-title"><strong>${app}</strong><strong>${money(g-c)}</strong></div><p class="small muted">Bruto ${money(g)} · despesas ${money(c)} · horas ${h.toFixed(1)}</p>`;
+    }).join('');
+  }
 
-    setAppData(prev => ({
-      ...prev,
-      maintenance: [newRecord, ...prev.maintenance]
-    }));
+  // MOTO E CICLOS DE PEÇAS
+  $('bikeForm').onsubmit=e=>{
+    e.preventDefault();db.bike={model:value('bModel'),year:value('bYear'),plate:value('bPlate'),km:number('bKm')};
+    save();notify('Veículo salvo.');
+  };
+  function resetMaint(){ $('maintForm').reset();$('mId').value='';$('mDate').value=today();$('mPart').value=0;$('mLabor').value=0; }
+  $('clearMaint').onclick=resetMaint;
+  $('maintForm').onsubmit=e=>{
+    e.preventDefault();const edit=value('mId'),m={
+      id:edit||id(),category:value('mCategory'),name:value('mName'),date:value('mDate'),km:number('mKm'),
+      part:number('mPart'),labor:number('mLabor'),lifeKm:number('mLifeKm'),lifeMonths:number('mLifeMonths'),
+      supplier:value('mSupplier'),nextDate:value('mNextDate'),notes:value('mNotes'),updatedAt:new Date().toISOString()
+    };
+    if(m.km>number('bKm')) db.bike.km=m.km;
+    if(edit)db.maintenance=db.maintenance.map(x=>x.id===edit?m:x);else db.maintenance.push(m);
+    resetMaint();save();notify('Manutenção salva.');
+  };
+  window.editMaint=key=>{
+    const m=db.maintenance.find(x=>x.id===key);if(!m)return;go('moto');
+    const map={mId:'id',mCategory:'category',mName:'name',mDate:'date',mKm:'km',mPart:'part',mLabor:'labor',mLifeKm:'lifeKm',mLifeMonths:'lifeMonths',mSupplier:'supplier',mNextDate:'nextDate',mNotes:'notes'};
+    Object.entries(map).forEach(([a,b])=>$(a).value=m[b]??'');
+  };
+  window.deleteMaint=key=>{if(confirm('Excluir esta manutenção?')){db.maintenance=db.maintenance.filter(x=>x.id!==key);save();notify('Manutenção excluída.');}};
+  function renderMaint(){
+    $('maintRows').innerHTML=db.maintenance.slice().sort((a,b)=>a.km-b.km).map(m=>{
+      const next=db.maintenance.filter(x=>x.category===m.category&&x.km>m.km).sort((a,b)=>a.km-b.km)[0];
+      const km=next?next.km-m.km:Math.max(0,(+db.bike.km||0)-m.km);
+      const cost=(+m.part||0)+(+m.labor||0);
+      return `<tr><td>${dateBR(m.date)}</td><td>${m.name}<div class="small muted">${m.category}</div></td><td>${m.km.toLocaleString('pt-BR')} km</td>
+      <td>${money(cost)}</td><td>${km.toLocaleString('pt-BR')} km ${next?'(fechado)':'(parcial)'}</td><td>${km?money(cost/km*1000):'—'}</td>
+      <td><button class="smallbtn secondary" onclick="editMaint('${m.id}')">Editar</button><button class="smallbtn danger" onclick="deleteMaint('${m.id}')">Excluir</button></td></tr>`;
+    }).join('')||'<tr><td colspan="7" class="empty">Nenhuma manutenção cadastrada.</td></tr>';
+  }
 
-    setForm({
-      item: '',
-      cost: '',
-      date: new Date().toISOString().split('T')[0],
-      category: 'Manutenção Preventiva',
-      durabilityKm: '',
-      durabilityDays: '',
-      notes: ''
+  // DESPESAS
+  function resetExpense(){ $('expenseForm').reset();$('eId').value='';$('eDate').value=today(); }
+  $('clearExpense').onclick=resetExpense;
+  $('expenseForm').onsubmit=e=>{
+    e.preventDefault();const edit=value('eId'),x={id:edit||id(),date:value('eDate'),desc:value('eDesc'),category:value('eCategory'),amount:number('eValue'),due:value('eDue'),status:value('eStatus'),origin:value('eOrigin'),payment:value('ePayment'),notes:value('eNotes'),updatedAt:new Date().toISOString()};
+    if(edit)db.expenses=db.expenses.map(y=>y.id===edit?x:y);else db.expenses.push(x);
+    resetExpense();save();notify('Despesa salva.');
+  };
+  window.editExpense=key=>{
+    const x=db.expenses.find(y=>y.id===key);if(!x)return;go('despesas');
+    const map={eId:'id',eDate:'date',eDesc:'desc',eCategory:'category',eValue:'amount',eDue:'due',eStatus:'status',eOrigin:'origin',ePayment:'payment',eNotes:'notes'};
+    Object.entries(map).forEach(([a,b])=>$(a).value=x[b]??'');
+  };
+  window.deleteExpense=key=>{if(confirm('Excluir esta despesa?')){db.expenses=db.expenses.filter(x=>x.id!==key);save();notify('Despesa excluída.');}};
+  function renderExpenses(){
+    $('expenseRows').innerHTML=db.expenses.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>`<tr>
+      <td>${dateBR(x.date)}</td><td>${x.desc}</td><td>${x.category}</td><td>${x.origin}</td><td>${money(x.amount)}</td><td>${x.status}</td>
+      <td><button class="smallbtn secondary" onclick="editExpense('${x.id}')">Editar</button><button class="smallbtn danger" onclick="deleteExpense('${x.id}')">Excluir</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">Nenhuma despesa cadastrada.</td></tr>';
+    $('eTotal').textContent=money(db.expenses.reduce((s,x)=>s+x.amount,0));
+    $('ePending').textContent=money(db.expenses.filter(x=>x.status==='Pendente').reduce((s,x)=>s+x.amount,0));
+  }
+
+  // ENVELOPES
+  function setupEnvelopes(){
+    $('percentFields').innerHTML=envelopeNames.map((n,i)=>`<div class="field"><label>${n} (%)</label><input id="pct${i}" type="number" min="0" max="100" step=".1" value="${defaultPercents[i]}"></div>`).join('');
+    $('adjName').innerHTML=envelopeNames.map(n=>`<option>${n}</option>`).join('');
+  }
+  function previewAlloc(){
+    const amount=number('aAmount');let total=0;
+    const lines=envelopeNames.map((n,i)=>{const p=Number($('pct'+i).value)||0;total+=p;return `<li>${n}: ${money(amount*p/100)} (${p}%)</li>`;});
+    $('allocPreview').innerHTML=`<p class="${Math.abs(total-100)<0.001?'green':'red'}">Percentuais somados: ${total.toFixed(1)}%</p><ul>${lines.join('')}</ul>`;
+    return Math.abs(total-100)<0.001;
+  }
+  $('previewAlloc').onclick=previewAlloc;
+  $('allocForm').onsubmit=e=>{
+    e.preventDefault();if(!previewAlloc()){notify('Os percentuais devem totalizar 100%.');return;}
+    const amount=Math.round(number('aAmount')*100);
+    if(amount<=0)return;
+    let assigned=0;
+    envelopeNames.forEach((n,i)=>{
+      const cents=i===envelopeNames.length-1?amount-assigned:Math.round(amount*(Number($('pct'+i).value)||0)/100);
+      assigned+=cents;const v=cents/100;
+      db.envelopes[n]=(db.envelopes[n]||0)+v;
+      db.allocations.push({id:id(),date:today(),type:'Distribuição',name:n,amount:v});
     });
+    save();$('aAmount').value='';notify('Distribuição registrada.');
   };
-
-  const handleDeleteRecord = (id) => {
-    setAppData(prev => ({
-      ...prev,
-      maintenance: prev.maintenance.filter(m => m.id !== id)
-    }));
+  $('applyAdjust').onclick=()=>{
+    const n=value('adjName'),v=Math.round(number('adjValue')*100)/100;
+    if(!v){notify('Informe um valor diferente de zero.');return;}
+    if((db.envelopes[n]||0)+v<0){notify('O saldo não pode ficar negativo.');return;}
+    db.envelopes[n]=(db.envelopes[n]||0)+v;
+    db.allocations.push({id:id(),date:today(),type:'Ajuste',name:n,amount:v});
+    $('adjValue').value='';save();notify('Ajuste registrado.');
   };
+  function renderEnvelopes(){
+    $('envelopeCards').innerHTML=envelopeNames.map(n=>`<div class="section-title"><span>${n}</span><strong>${money(db.envelopes[n]||0)}</strong></div>`).join('');
+    $('allocRows').innerHTML=db.allocations.slice().reverse().map(a=>`<tr><td>${dateBR(a.date)}</td><td>${a.type}</td><td>${a.name}</td><td>${money(a.amount)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Sem movimentações.</td></tr>';
+  }
 
-  const totalMaintenanceCost = useMemo(() => {
-    return appData.maintenance.reduce((acc, m) => acc + (m.cost || 0), 0);
-  }, [appData.maintenance]);
+  // METAS
+  $('goalForm').onsubmit=e=>{e.preventDefault();db.goal=number('goalAmount');save();notify('Meta atualizada.');};
+  $('targetForm').onsubmit=e=>{
+    e.preventDefault();const name=value('targetName');
+    db.targets=db.targets.filter(t=>t.name!==name);
+    db.targets.push({id:id(),name,amount:number('targetAmount'),date:value('targetDate')});
+    save();notify('Objetivo salvo.');
+  };
+  window.deleteTarget=key=>{if(confirm('Remover este objetivo?')){db.targets=db.targets.filter(t=>t.id!==key);save();}};
+  function renderTargets(){
+    $('targetList').innerHTML=db.targets.map(t=>{
+      const env=t.name==='Viagem ao Paraguai'?'Fundo viagem Paraguai':t.name==='Capital para perfumes'?'Capital perfumes':t.name==='Reserva de emergência'?'Reserva de emergência':'Reserva manutenção moto';
+      const bal=db.envelopes[env]||0,pct=Math.min(100,bal/(t.amount||1)*100);
+      return `<div class="section"><strong>${t.name}</strong><p class="small muted">${money(bal)} de ${money(t.amount)} · prazo ${dateBR(t.date)}</p><div class="progress"><span style="width:${pct}%"></span></div><button class="smallbtn danger" onclick="deleteTarget('${t.id}')">Remover</button></div>`;
+    }).join('')||'<p class="small muted">Nenhum objetivo cadastrado.</p>';
+  }
 
-  const iosInputClass = "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500";
+  // DASHBOARD
+  function renderDashboard(){
+    const totalGross=db.turns.reduce((s,t)=>s+gross(t),0);
+    const totalNet=db.turns.reduce((s,t)=>s+net(t),0);
+    const expenses=db.expenses.reduce((s,x)=>s+x.amount,0);
+    const maint=db.maintenance.reduce((s,m)=>s+(+m.part||0)+(+m.labor||0),0);
+    const monthNet=db.turns.filter(t=>currentMonth(t.date)).reduce((s,t)=>s+net(t),0);
+    const pct=Math.min(100,Math.max(0,monthNet/(db.goal||1500)*100));
+    $('dProfit').textContent=money(totalNet);$('dGross').textContent=money(totalGross);
+    $('dExpenses').textContent=money(expenses);$('dMaintenance').textContent=money(maint);
+    $('dGoal').textContent=pct.toFixed(0)+'%';$('dGoalBar').style.width=pct+'%';
+    $('dGoalText').textContent=`${money(monthNet)} de ${money(db.goal)} neste mês`;
+    $('dTrip').textContent=money(db.envelopes['Fundo viagem Paraguai']||0);
+    $('dPerfume').textContent=money(db.envelopes['Capital perfumes']||0);
+    const next=db.maintenance.filter(m=>m.nextDate).sort((a,b)=>a.nextDate.localeCompare(b.nextDate))[0];
+    $('dNext').textContent=next?dateBR(next.nextDate):'—';
+    $('dNextText').textContent=next?next.name:'Sem previsão cadastrada';
+    $('dCounts').textContent=`${db.turns.length} turnos · ${db.maintenance.length} manutenções · ${db.expenses.length} despesas`;
+    $('goalAmount').value=db.goal||1500;$('goalValue').textContent=money(monthNet);
+    $('goalBar').style.width=pct+'%';$('goalText').textContent=`Faltam ${money(Math.max(0,db.goal-monthNet))} para a meta mensal.`;
+    const max=Math.max(1,...['99','iFood'].map(app=>Math.abs(db.turns.filter(t=>t.app===app).reduce((s,t)=>s+net(t),0))));
+    $('platformChart').innerHTML=['99','iFood'].map(app=>{
+      const n=db.turns.filter(t=>t.app===app).reduce((s,t)=>s+net(t),0);
+      return `<div class="barline"><strong>${app}</strong><div class="bar"><span style="width:${Math.max(0,n)/max*100}%"></span></div><span style="text-align:right">${money(n)}</span></div>`;
+    }).join('');
+  }
 
-  return (
-    <div className="space-y-4">
-      {/* ODÓMETRO & RESUMO */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md space-y-3">
-        <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Gasto Total com Moto</span>
-            <span className="text-xl font-black text-rose-400">{formatBRL(totalMaintenanceCost)}</span>
-          </div>
-          <div className="text-right">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">KM Atual</span>
-            <span className="text-lg font-black text-emerald-400">{appData.bikeKm || 0} km</span>
-          </div>
-        </div>
+  function render(){
+    renderDashboard();renderTurns();renderMaint();renderExpenses();renderEnvelopes();renderTargets();
+    const b=db.bike||{};
+    $('bModel').value=b.model||'';$('bYear').value=b.year||'';$('bPlate').value=b.plate||'';$('bKm').value=b.km??0;
+  }
 
-        <form onSubmit={handleUpdateKm} className="flex gap-2 pt-1">
-          <input 
-            type="number" 
-            placeholder="Atualizar Odômetro (KM)" 
-            value={currentKm} 
-            onChange={(e) => setCurrentKm(e.target.value)} 
-            className={`${iosInputClass} flex-1`}
-          />
-          <button type="submit" className="bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold px-3 py-2 rounded-xl text-xs border border-slate-700 transition-colors whitespace-nowrap">
-            Atualizar KM
-          </button>
-        </form>
-      </div>
+  // BACKUP E CSV
+  $('backupBtn').onclick=()=>{
+    const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='meu-controle-360-backup-'+today()+'.json';a.click();URL.revokeObjectURL(a.href);
+    notify('Backup JSON exportado.');
+  };
+  window.exportCSV=()=>{
+    const rows=[['Data','Aplicativo','Horas','KM','Bruto','Despesas','Lucro operacional'],
+      ...db.turns.map(t=>[t.date,t.app,duration(t).toFixed(2),distance(t).toFixed(1),gross(t).toFixed(2),costs(t).toFixed(2),net(t).toFixed(2)])];
+    const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));
+    a.download='turnos-meu-controle-360.csv';a.click();URL.revokeObjectURL(a.href);
+  };
+  $('themeBtn').onclick=()=>{document.body.classList.toggle('dark');localStorage.setItem('mc360_dark',document.body.classList.contains('dark')?'1':'0');};
+  if(localStorage.getItem('mc360_dark')==='1')document.body.classList.add('dark');
 
-      {/* REGISTRO DE NOVA MANUTENÇÃO */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
-        <h3 className="text-xs font-bold text-slate-100 mb-3 flex items-center gap-2">
-          <Plus className="w-4 h-4 text-emerald-400" /> Registrar Peça / Serviço
-        </h3>
-
-        <form onSubmit={handleAddMaintenance} className="space-y-3">
-          <div>
-            <label className="text-[10px] text-slate-400 mb-1 block">Peça / Serviço *</label>
-            <input 
-              type="text" 
-              placeholder="Ex: Troca de Óleo, Pneu Traseiro, Relação..." 
-              value={form.item} 
-              onChange={e => setForm({...form, item: e.target.value})} 
-              className={iosInputClass} 
-              required 
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-slate-400 mb-1 block">Valor (R$) *</label>
-              <input 
-                type="number" 
-                step="0.01" 
-                placeholder="0.00" 
-                value={form.cost} 
-                onChange={e => setForm({...form, cost: e.target.value})} 
-                className={`${iosInputClass} font-bold text-rose-400`} 
-                required 
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400 mb-1 block">Data *</label>
-              <input 
-                type="date" 
-                value={form.date} 
-                onChange={e => setForm({...form, date: e.target.value})} 
-                className={iosInputClass} 
-                required 
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] text-slate-400 mb-1 block">Categoria</label>
-            <select 
-              value={form.category} 
-              onChange={e => setForm({...form, category: e.target.value})} 
-              className={iosInputClass}
-            >
-              <option value="Manutenção Preventiva">Manutenção Preventiva</option>
-              <option value="Peça / Desgaste">Peça / Desgaste</option>
-              <option value="Reparo / Pneu">Reparo / Pneu</option>
-              <option value="Acessório / Ajuste">Acessório / Ajuste</option>
-            </select>
-          </div>
-
-          {/* ESTIMATIVA DE DURABILIDADE */}
-          <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-            <div>
-              <label className="text-[10px] text-slate-400 mb-1 block">Durabilidade (KM)</label>
-              <input 
-                type="number" 
-                placeholder="Ex: 3000 km" 
-                value={form.durabilityKm} 
-                onChange={e => setForm({...form, durabilityKm: e.target.value})} 
-                className={iosInputClass} 
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400 mb-1 block">Durabilidade (Dias)</label>
-              <input 
-                type="number" 
-                placeholder="Ex: 180 dias" 
-                value={form.durabilityDays} 
-                onChange={e => setForm({...form, durabilityDays: e.target.value})} 
-                className={iosInputClass} 
-              />
-            </div>
-          </div>
-
-          <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-2.5 rounded-xl transition-all text-xs active:scale-95 shadow-md">
-            Salvar Manutenção
-          </button>
-        </form>
-      </div>
-
-      {/* HISTÓRICO DE MANUTENÇÕES */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
-        <h3 className="text-xs font-bold text-slate-200 mb-3 flex items-center justify-between">
-          <span className="flex items-center gap-1.5"><Bike className="w-4 h-4 text-emerald-400" /> Histórico de Peças e Serviços</span>
-          <span className="text-[10px] text-slate-400">{appData.maintenance.length} registros</span>
-        </h3>
-
-        {appData.maintenance.length === 0 ? (
-          <p className="text-xs text-slate-500 text-center py-6">Nenhuma manutenção cadastrada ainda.</p>
-        ) : (
-          <div className="space-y-2.5">
-            {appData.maintenance.map((m) => {
-              const kmDrivenSince = appData.bikeKm - (m.installedAtKm || 0);
-              const isOverKm = m.durabilityKm && kmDrivenSince >= m.durabilityKm;
-
-              return (
-                <div key={m.id} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-start text-xs space-y-1">
-                  <div className="flex-1 pr-2">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-extrabold text-slate-100">{m.item}</span>
-                      <span className="text-[9px] px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded font-semibold">{m.category}</span>
-                    </div>
-
-                    <div className="text-[10px] text-slate-400 flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                      <span>Data: <strong className="text-slate-300">{formatDateBR(m.date)}</strong></span>
-                      {m.installedAtKm > 0 && <span>Instalado em: <strong className="text-slate-300">{m.installedAtKm} km</strong></span>}
-                    </div>
-
-                    {/* ESTIMATIVA & ALERTA DE DURABILIDADE */}
-                    {(m.durabilityKm || m.durabilityDays) && (
-                      <div className="mt-1.5 pt-1.5 border-t border-slate-900 flex flex-wrap items-center gap-2 text-[10px]">
-                        {m.durabilityKm && (
-                          <span className={`px-2 py-0.5 rounded font-bold ${isOverKm ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-900 text-slate-300'}`}>
-                            {kmDrivenSince} / {m.durabilityKm} km {isOverKm && '⚠️ Recomenda-se Troca!'}
-                          </span>
-                        )}
-                        {m.durabilityDays && (
-                          <span className="text-slate-400">
-                            Durabilidade est.: {m.durabilityDays} dias
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col items-end gap-2">
-                    <span className="font-black text-rose-400 text-sm">{formatBRL(m.cost)}</span>
-                    <button 
-                      onClick={() => handleDeleteRecord(m.id)}
-                      className="p-1 text-slate-500 hover:text-rose-400 transition-colors"
-                      title="Excluir"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PerfumesModule({ appData }) {
-  return (
-    <div className="space-y-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md text-center py-8">
-        <ShoppingBag className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-        <h3 className="text-sm font-bold text-slate-200">Parfums Selection</h3>
-        <p className="text-xs text-slate-400 mt-1">Fundo para compras de perfumes importados.</p>
-      </div>
-    </div>
-  );
-}
-
-function ReportsModule({ appData, runSelfTest, setAppData, setShowResetModal, setShowPwaModal }) {
-  return (
-    <div className="space-y-3">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md space-y-2.5">
-        <h3 className="text-xs font-bold text-slate-200 mb-2">Opções & Ferramentas</h3>
-        
-        <button onClick={() => setShowPwaModal(true)} className="w-full p-3 bg-slate-950 border border-slate-800 hover:border-emerald-500/50 rounded-xl flex items-center justify-between text-xs text-slate-200">
-          <span className="flex items-center gap-2"><Download className="w-4 h-4 text-emerald-400" /> Instalar no iPhone</span>
-          <ChevronRight className="w-4 h-4 text-slate-500" />
-        </button>
-
-        <button onClick={runSelfTest} className="w-full p-3 bg-slate-950 border border-slate-800 hover:border-teal-500/50 rounded-xl flex items-center justify-between text-xs text-slate-200">
-          <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-teal-400" /> Diagnóstico do Sistema</span>
-          <ChevronRight className="w-4 h-4 text-slate-500" />
-        </button>
-
-        <button onClick={() => setShowResetModal(true)} className="w-full p-3 bg-rose-950/20 border border-rose-500/30 rounded-xl flex items-center justify-between text-xs text-rose-300">
-          <span className="flex items-center gap-2"><RotateCcw className="w-4 h-4 text-rose-400" /> Zerar Todos os Dados</span>
-          <ChevronRight className="w-4 h-4 text-rose-500/50" />
-        </button>
-      </div>
-    </div>
-  );
-}
+  setupEnvelopes();render();
+  if('serviceWorker' in navigator && location.protocol!=='file:'){
+    navigator.serviceWorker.register('./sw.js').catch(()=>notify('Não foi possível ativar o modo offline.'));
+  }
+})();
+</script>
+</body>
+</html>
