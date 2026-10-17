@@ -1,0 +1,893 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  LayoutDashboard, 
+  Bike, 
+  DollarSign, 
+  Calendar, 
+  Settings, 
+  Plus, 
+  Trash2, 
+  Download, 
+  Upload, 
+  ShieldCheck, 
+  ChevronRight, 
+  Sun, 
+  Moon, 
+  Award, 
+  Info, 
+  RotateCcw, 
+  Flame, 
+  Target, 
+  TrendingUp, 
+  Clock, 
+  ShoppingBag, 
+  ArrowDownRight, 
+  Smartphone, 
+  Monitor, 
+  CheckCircle2, 
+  AlertTriangle 
+} from 'lucide-react';
+
+const ZEROED_STATE = {
+  shifts: [],
+  maintenance: [],
+  expenses: [],
+  perfumes: [],
+  bikeKm: 0,
+  monthlyGoal: 1500.00,
+  shiftRefDate: '2026-10-17'
+};
+
+const formatBRL = (val) => {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+};
+
+const formatDateBR = (dateStr) => {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+const getShift12x36 = (dateStr, refDateStr = '2026-10-17') => {
+  const ref = new Date(refDateStr + 'T00:00:00');
+  const target = new Date(dateStr + 'T00:00:00');
+  const diffTime = target.getTime() - ref.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+  return Math.abs(diffDays) % 2 === 0 ? 'PLANTÃO PRODEMGE' : 'FOLGA';
+};
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [theme, setTheme] = useState('dark');
+  const [showPwaModal, setShowPwaModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [isMobilePreviewMode, setIsMobilePreviewMode] = useState(false); // Toggle frame on desktop
+
+  const [appData, setAppData] = useState(() => {
+    const local = localStorage.getItem('meu_controle_360_data');
+    if (local) {
+      try {
+        return JSON.parse(local);
+      } catch (e) {
+        return ZEROED_STATE;
+      }
+    }
+    return ZEROED_STATE;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('meu_controle_360_data', JSON.stringify(appData));
+  }, [appData]);
+
+  const handleResetData = () => {
+    setAppData(ZEROED_STATE);
+    localStorage.removeItem('meu_controle_360_data');
+    setShowResetModal(false);
+  };
+
+  const metrics = useMemo(() => {
+    const totalGross99 = appData.shifts.filter(s => s.app === '99').reduce((acc, s) => acc + (s.totalGross || 0), 0);
+    const totalGrossIFood = appData.shifts.filter(s => s.app === 'iFood').reduce((acc, s) => acc + (s.totalGross || 0), 0);
+    const totalGrossExtra = totalGross99 + totalGrossIFood;
+    const totalShiftExpenses = appData.shifts.reduce((acc, s) => acc + (s.totalExpenses || 0), 0);
+    const totalNetProfitExtra = totalGrossExtra - totalShiftExpenses;
+    
+    const totalBikeMaintenanceCost = appData.maintenance.reduce((acc, m) => acc + (m.totalCost || 0), 0);
+    const totalHoursWorked = appData.shifts.reduce((acc, s) => acc + (s.durationHours || 0), 0);
+    const totalKmDriven = appData.shifts.reduce((acc, s) => acc + (s.distanceKm || 0), 0);
+
+    const goalProgressPct = appData.monthlyGoal > 0 
+      ? Math.min(100, Math.round((totalNetProfitExtra / appData.monthlyGoal) * 100))
+      : 0;
+
+    return {
+      totalGross99,
+      totalGrossIFood,
+      totalGrossExtra,
+      totalShiftExpenses,
+      totalNetProfitExtra,
+      totalBikeMaintenanceCost,
+      totalHoursWorked,
+      totalKmDriven,
+      goalProgressPct,
+      avgHourlyNet: totalHoursWorked > 0 ? (totalNetProfitExtra / totalHoursWorked) : 0,
+      avgCostPerKm: totalKmDriven > 0 ? (totalShiftExpenses / totalKmDriven) : 0
+    };
+  }, [appData]);
+
+  const runSelfTest = () => {
+    const testShift = { grossEarnings: 100, fuelExpense: 20, foodExpense: 10, durationHours: 4, distanceKm: 50 };
+    const netProfit = testShift.grossEarnings - (testShift.fuelExpense + testShift.foodExpense);
+    const hourly = netProfit / testShift.durationHours;
+    alert(`✅ Diagnóstico OK!\n- Lucro: R$ ${netProfit}\n- Valor/Hora: R$ ${hourly}/h`);
+  };
+
+  return (
+    <div className={`min-h-screen w-full transition-colors duration-200 font-sans flex flex-col justify-start items-center ${
+      theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-200 text-slate-900'
+    }`}>
+
+      {/* TOP DESKTOP HEADER BAR (Visible only on large screens) */}
+      <header className="hidden lg:flex w-full bg-slate-900/90 border-b border-slate-800 px-6 py-2.5 justify-between items-center text-xs">
+        <div className="flex items-center gap-2">
+          <Smartphone className="w-4 h-4 text-emerald-400" />
+          <span className="font-bold text-slate-200">Modo de Visualização Telemóvel (iPhone / Mobile First)</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsMobilePreviewMode(!isMobilePreviewMode)}
+            className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-medium transition-all flex items-center gap-1.5"
+          >
+            {isMobilePreviewMode ? <Monitor className="w-3.5 h-3.5 text-teal-400" /> : <Smartphone className="w-3.5 h-3.5 text-emerald-400" />}
+            <span>{isMobilePreviewMode ? 'Expandir Tela Inteira' : 'Ver Moldura Telemóvel'}</span>
+          </button>
+        </div>
+      </header>
+
+      {/* MAIN DEVICE LAYOUT CONTAINER */}
+      <div className={`w-full transition-all duration-300 ${
+        isMobilePreviewMode 
+          ? 'lg:max-w-[420px] lg:my-6 lg:rounded-[48px] lg:border-[10px] lg:border-slate-800 lg:shadow-2xl lg:shadow-emerald-500/10 lg:overflow-hidden lg:ring-1 lg:ring-slate-700' 
+          : 'max-w-2xl'
+      }`}>
+        
+        {/* TELEMÓVEL MOCKUP TOP NOTCH (Visible only in desktop frame mode) */}
+        {isMobilePreviewMode && (
+          <div className="hidden lg:flex justify-center bg-slate-900 pt-2 pb-1">
+            <div className="w-28 h-4 bg-slate-950 rounded-full flex items-center justify-between px-2.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-slate-800" />
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
+            </div>
+          </div>
+        )}
+
+        {/* INNER APP VIEWPORT */}
+        <div className={`min-h-screen lg:min-h-[820px] flex flex-col justify-between ${
+          theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
+        } pb-10`}>
+
+          {/* APP STICKY MOBILE HEADER WITH SIDE-BY-SIDE TABS */}
+          <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/95 border-b border-slate-800 px-3.5 pt-safe-top py-2.5 flex flex-col gap-2.5 shadow-md">
+            <div className="flex justify-between items-center w-full">
+              <div className="flex items-center gap-2">
+                <div className="bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-2 rounded-xl text-slate-950 shadow-md shadow-emerald-500/20">
+                  <Bike className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h1 className="font-black text-base tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 bg-clip-text text-transparent">
+                    Gestão Parfums
+                  </h1>
+                  <p className="text-[10px] text-slate-400 font-medium">Prodemge • 99 • iFood • Parfums</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={() => setShowResetModal(true)}
+                  className="p-1.5 px-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all text-xs flex items-center gap-1 font-semibold active:scale-95"
+                  title="Zerar Sistema"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">Zerar</span>
+                </button>
+
+                <button 
+                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700 active:scale-95"
+                >
+                  {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-slate-400" />}
+                </button>
+              </div>
+            </div>
+
+            {/* TOP NAVIGATION BAR (Horizontal side-by-side tabs at the top) */}
+            <nav className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar pt-1 border-t border-slate-800/60 pb-0.5">
+              <NavButton icon={<LayoutDashboard className="w-3.5 h-3.5" />} label="Início" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+              <NavButton icon={<DollarSign className="w-3.5 h-3.5" />} label="Turnos" active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} />
+              <NavButton icon={<Calendar className="w-3.5 h-3.5" />} label="Escala" active={activeTab === 'planning'} onClick={() => setActiveTab('planning')} />
+              <NavButton icon={<Bike className="w-3.5 h-3.5" />} label="Moto" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} />
+              <NavButton icon={<ShoppingBag className="w-3.5 h-3.5" />} label="Parfums" active={activeTab === 'perfumes'} onClick={() => setActiveTab('perfumes')} />
+              <NavButton icon={<Award className="w-3.5 h-3.5" />} label="Opções" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
+            </nav>
+          </header>
+
+          {/* ACTIVE CONTENT VIEW */}
+          <main className="p-3.5 sm:p-4 flex-1">
+            {activeTab === 'dashboard' && (
+              <DashboardView 
+                appData={appData} 
+                metrics={metrics} 
+                setActiveTab={setActiveTab} 
+              />
+            )}
+            {activeTab === 'shifts' && (
+              <ShiftsModule appData={appData} setAppData={setAppData} />
+            )}
+            {activeTab === 'planning' && (
+              <PlanningModule appData={appData} setAppData={setAppData} />
+            )}
+            {activeTab === 'maintenance' && (
+              <MaintenanceModule appData={appData} setAppData={setAppData} />
+            )}
+            {activeTab === 'perfumes' && (
+              <PerfumesModule appData={appData} />
+            )}
+            {activeTab === 'reports' && (
+              <ReportsModule 
+                appData={appData} 
+                runSelfTest={runSelfTest} 
+                setAppData={setAppData} 
+                setShowResetModal={setShowResetModal}
+                setShowPwaModal={setShowPwaModal}
+              />
+            )}
+          </main>
+
+        </div>
+      </div>
+
+      {/* RESET CONFIRMATION MODAL */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-slate-200">
+            <div className="flex items-center gap-3 text-rose-500 mb-3">
+              <AlertTriangle className="w-7 h-7" />
+              <h3 className="text-lg font-bold text-slate-100">Zerar Todos os Dados?</h3>
+            </div>
+            <p className="text-xs text-slate-300 mb-6 leading-relaxed">
+              Esta ação limpará turnos, manutenções e registros salvos no aplicativo Gestão Parfums.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => setShowResetModal(false)}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-xs transition-colors active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleResetData}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-colors shadow-lg active:scale-95"
+              >
+                Sim, Zerar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PWA iOS INSTALL MODAL */}
+      {showPwaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-slate-200">
+            <h3 className="text-lg font-bold text-emerald-400 mb-2 flex items-center gap-2">
+              <Download className="w-5 h-5" /> Instalar no iPhone
+            </h3>
+            <p className="text-xs text-slate-300 mb-4">
+              Siga os passos no Safari para adicionar como App:
+            </p>
+            <ol className="list-decimal list-inside space-y-2 text-xs text-slate-300 mb-6 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+              <li>Abra esta página no <strong>Safari</strong>.</li>
+              <li>Toque no botão <strong>Compartilhar</strong> (ícone com seta).</li>
+              <li>Selecione <strong>"Adicionar à Tela de Início"</strong>.</li>
+            </ol>
+            <button 
+              onClick={() => setShowPwaModal(false)}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl transition-colors active:scale-95 text-xs"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NavButton({ icon, label, active, onClick }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl transition-all active:scale-95 touch-manipulation whitespace-nowrap text-xs ${
+        active 
+          ? 'bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30 shadow-sm' 
+          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+      }`}
+    >
+      {icon}
+      <span className="tracking-tight">{label}</span>
+    </button>
+  );
+}
+
+function DashboardView({ appData, metrics, setActiveTab }) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const shiftToday = getShift12x36(todayStr, appData.shiftRefDate);
+
+  return (
+    <div className="space-y-3.5">
+      {/* STATUS HERO CARD */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-4 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Status de Hoje</span>
+              <span className="text-[10px] text-slate-500">• {formatDateBR(todayStr)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-black text-slate-100">
+                {shiftToday.includes('PLANTÃO') ? 'Dia de Plantão' : 'Dia Livre'}
+              </h2>
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide border ${
+                shiftToday.includes('PLANTÃO') 
+                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' 
+                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+              }`}>
+                {shiftToday}
+              </span>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => setActiveTab('shifts')}
+            className="w-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 text-xs"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>Lançar Turno</span>
+          </button>
+        </div>
+      </div>
+
+      {/* GOAL CARD */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
+        <div className="flex justify-between items-start mb-2">
+          <div>
+            <div className="flex items-center gap-1 mb-0.5">
+              <Target className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Meta do Mês</span>
+            </div>
+            <h3 className="text-2xl font-black text-emerald-400">
+              {formatBRL(metrics.totalNetProfitExtra)}
+            </h3>
+          </div>
+          <div className="text-right bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+            <span className="text-xl font-black text-slate-100">{metrics.goalProgressPct}%</span>
+          </div>
+        </div>
+
+        <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden my-2.5 p-0.5 border border-slate-800">
+          <div 
+            className="bg-gradient-to-r from-teal-400 via-emerald-400 to-emerald-500 h-full rounded-full transition-all duration-500"
+            style={{ width: `${metrics.goalProgressPct}%` }}
+          />
+        </div>
+
+        <div className="flex justify-between items-center text-[11px] text-slate-400">
+          <span>Meta: <strong className="text-slate-200">{formatBRL(appData.monthlyGoal)}</strong></span>
+          <span className="text-emerald-400 font-bold">{metrics.goalProgressPct >= 100 ? '🎉 Meta Atingida!' : 'Em progresso'}</span>
+        </div>
+      </div>
+
+      {/* METRICS GRID */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <KpiCard title="Ganhos 99" value={formatBRL(metrics.totalGross99)} color="emerald" icon={<DollarSign className="w-3.5 h-3.5" />} />
+        <KpiCard title="Ganhos iFood" value={formatBRL(metrics.totalGrossIFood)} color="teal" icon={<DollarSign className="w-3.5 h-3.5" />} />
+        <KpiCard title="Despesas" value={formatBRL(metrics.totalShiftExpenses)} color="rose" icon={<ArrowDownRight className="w-3.5 h-3.5" />} />
+        <KpiCard title="Lucro Real" value={formatBRL(metrics.totalNetProfitExtra)} color="amber" icon={<Flame className="w-3.5 h-3.5" />} />
+      </div>
+
+      {/* RECENT SHIFTS */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-emerald-400" /> Últimos Turnos
+          </h3>
+          <button onClick={() => setActiveTab('shifts')} className="text-[11px] text-emerald-400 font-bold hover:underline">
+            Ver Todos
+          </button>
+        </div>
+
+        {appData.shifts.length === 0 ? (
+          <p className="text-xs text-slate-500 text-center py-4">Nenhum turno cadastrado ainda.</p>
+        ) : (
+          <div className="space-y-2">
+            {appData.shifts.slice(-2).reverse().map((shift) => (
+              <div key={shift.id} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 flex justify-between items-center text-xs">
+                <div>
+                  <span className="font-bold text-slate-200">{formatDateBR(shift.date)}</span>
+                  <span className={`ml-2 px-1.5 py-0.2 text-[9px] rounded font-extrabold ${shift.app === '99' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                    {shift.app}
+                  </span>
+                </div>
+                <span className="font-black text-emerald-400">{formatBRL(shift.netProfit)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({ title, value, color, icon }) {
+  const colorMap = {
+    emerald: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5',
+    teal: 'text-teal-400 border-teal-500/20 bg-teal-500/5',
+    rose: 'text-rose-400 border-rose-500/20 bg-rose-500/5',
+    amber: 'text-amber-400 border-amber-500/20 bg-amber-500/5',
+  };
+
+  return (
+    <div className={`border rounded-2xl p-3 shadow-sm ${colorMap[color]}`}>
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-[10px] text-slate-400 font-bold uppercase">{title}</span>
+        {icon}
+      </div>
+      <p className={`text-lg font-black ${colorMap[color].split(' ')[0]}`}>{value}</p>
+    </div>
+  );
+}
+
+function ShiftsModule({ appData, setAppData }) {
+  const [form, setForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    app: '99',
+    startTime: '08:00',
+    endTime: '12:00',
+    startKm: appData.bikeKm || 0,
+    endKm: (appData.bikeKm || 0) + 50,
+    grossEarnings: '',
+    fuelExpense: 0,
+    foodExpense: 0,
+    otherExpense: 0
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const [startH, startM] = form.startTime.split(':').map(Number);
+    const [endH, endM] = form.endTime.split(':').map(Number);
+    let durationHours = (endH + endM / 60) - (startH + startM / 60);
+    if (durationHours <= 0) durationHours += 24;
+
+    const startKmNum = Number(form.startKm) || 0;
+    const endKmNum = Number(form.endKm) || 0;
+    const distanceKm = Math.max(0, endKmNum - startKmNum);
+
+    const grossEarningsNum = Number(form.grossEarnings) || 0;
+    const fuelExpenseNum = Number(form.fuelExpense) || 0;
+    const foodExpenseNum = Number(form.foodExpense) || 0;
+    const otherExpenseNum = Number(form.otherExpense) || 0;
+
+    const totalGross = grossEarningsNum;
+    const totalExpenses = fuelExpenseNum + foodExpenseNum + otherExpenseNum;
+    const netProfit = totalGross - totalExpenses;
+
+    const newShift = {
+      id: 'shift_' + Date.now(),
+      ...form,
+      startKm: startKmNum,
+      endKm: endKmNum,
+      grossEarnings: grossEarningsNum,
+      fuelExpense: fuelExpenseNum,
+      foodExpense: foodExpenseNum,
+      otherExpense: otherExpenseNum,
+      durationHours: Number(durationHours.toFixed(2)),
+      distanceKm,
+      totalGross,
+      totalExpenses,
+      netProfit
+    };
+
+    setAppData(prev => ({
+      ...prev,
+      shifts: [...prev.shifts, newShift],
+      bikeKm: Math.max(prev.bikeKm || 0, endKmNum)
+    }));
+
+    setForm(prev => ({ ...prev, grossEarnings: '', fuelExpense: 0, foodExpense: 0, otherExpense: 0 }));
+    alert('Turno registrado!');
+  };
+
+  const iosInputClass = "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-base text-slate-100 focus:outline-none focus:border-emerald-500";
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
+        <h2 className="text-sm font-bold text-slate-100 mb-3 flex items-center gap-2">
+          <Plus className="w-4 h-4 text-emerald-400" /> Registrar Turno
+        </h2>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="text-[11px] text-slate-400 mb-1 block">Data</label>
+            <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className={iosInputClass} required />
+          </div>
+
+          <div>
+            <label className="text-[11px] text-slate-400 mb-1 block">Aplicativo</label>
+            <select value={form.app} onChange={e => setForm({...form, app: e.target.value})} className={iosInputClass}>
+              <option value="99">99 Motorista</option>
+              <option value="iFood">iFood Entregas</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1 block">Início / Fim</label>
+              <input type="time" value={form.startTime} onChange={e => setForm({...form, startTime: e.target.value})} className={iosInputClass} />
+            </div>
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1 block">&nbsp;</label>
+              <input type="time" value={form.endTime} onChange={e => setForm({...form, endTime: e.target.value})} className={iosInputClass} />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] text-slate-400 mb-1 block">Ganhos Brutos (R$)</label>
+            <input type="number" step="0.01" value={form.grossEarnings} onChange={e => setForm({...form, grossEarnings: e.target.value})} className={`${iosInputClass} font-bold text-emerald-400`} required />
+          </div>
+
+          <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-3 rounded-xl transition-all text-xs active:scale-95">
+            Salvar Registro
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function PlanningModule({ appData, setAppData }) {
+  const [refDate, setRefDate] = useState(appData.shiftRefDate || '2026-10-17');
+
+  const daysList = useMemo(() => {
+    const list = [];
+    const start = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const status = getShift12x36(dateStr, refDate);
+      list.push({ dateStr, status });
+    }
+    return list;
+  }, [refDate]);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
+        <h2 className="text-sm font-bold text-slate-100 mb-3 flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-emerald-400" /> Escala 12x36 Prodemge
+        </h2>
+
+        <div className="space-y-2">
+          {daysList.map((item, idx) => {
+            const isPlantao = item.status.includes('PLANTÃO');
+            return (
+              <div key={idx} className={`p-3 rounded-xl border flex justify-between items-center text-xs ${
+                isPlantao ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+              }`}>
+                <div>
+                  <span className="font-bold">{formatDateBR(item.dateStr)}</span>
+                  <p className="text-[10px] text-slate-400">{isPlantao ? 'Plantão Prodemge' : 'Folga Livre'}</p>
+                </div>
+                <span className="font-black text-[10px] px-2 py-1 rounded bg-slate-950 border border-slate-800">
+                  {isPlantao ? 'PRODEMGE' : 'LIVRE P/ 99'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MaintenanceModule({ appData, setAppData }) {
+  const [form, setForm] = useState({
+    item: '',
+    cost: '',
+    date: new Date().toISOString().split('T')[0],
+    category: 'Manutenção Preventiva',
+    durabilityKm: '',
+    durabilityDays: '',
+    notes: ''
+  });
+
+  const [currentKm, setCurrentKm] = useState(appData.bikeKm || 0);
+
+  const handleUpdateKm = (e) => {
+    e.preventDefault();
+    const newKm = Number(currentKm) || 0;
+    setAppData(prev => ({
+      ...prev,
+      bikeKm: newKm
+    }));
+    alert('Odômetro atualizado com sucesso!');
+  };
+
+  const handleAddMaintenance = (e) => {
+    e.preventDefault();
+    if (!form.item || !form.cost) return;
+
+    const costNum = Number(form.cost) || 0;
+    const durKmNum = form.durabilityKm ? Number(form.durabilityKm) : null;
+    const durDaysNum = form.durabilityDays ? Number(form.durabilityDays) : null;
+
+    const newRecord = {
+      id: 'maint_' + Date.now(),
+      item: form.item,
+      cost: costNum,
+      date: form.date,
+      category: form.category,
+      durabilityKm: durKmNum,
+      durabilityDays: durDaysNum,
+      notes: form.notes,
+      installedAtKm: appData.bikeKm || 0
+    };
+
+    setAppData(prev => ({
+      ...prev,
+      maintenance: [newRecord, ...prev.maintenance]
+    }));
+
+    setForm({
+      item: '',
+      cost: '',
+      date: new Date().toISOString().split('T')[0],
+      category: 'Manutenção Preventiva',
+      durabilityKm: '',
+      durabilityDays: '',
+      notes: ''
+    });
+  };
+
+  const handleDeleteRecord = (id) => {
+    setAppData(prev => ({
+      ...prev,
+      maintenance: prev.maintenance.filter(m => m.id !== id)
+    }));
+  };
+
+  const totalMaintenanceCost = useMemo(() => {
+    return appData.maintenance.reduce((acc, m) => acc + (m.cost || 0), 0);
+  }, [appData.maintenance]);
+
+  const iosInputClass = "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500";
+
+  return (
+    <div className="space-y-4">
+      {/* ODÓMETRO & RESUMO */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md space-y-3">
+        <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Gasto Total com Moto</span>
+            <span className="text-xl font-black text-rose-400">{formatBRL(totalMaintenanceCost)}</span>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">KM Atual</span>
+            <span className="text-lg font-black text-emerald-400">{appData.bikeKm || 0} km</span>
+          </div>
+        </div>
+
+        <form onSubmit={handleUpdateKm} className="flex gap-2 pt-1">
+          <input 
+            type="number" 
+            placeholder="Atualizar Odômetro (KM)" 
+            value={currentKm} 
+            onChange={(e) => setCurrentKm(e.target.value)} 
+            className={`${iosInputClass} flex-1`}
+          />
+          <button type="submit" className="bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold px-3 py-2 rounded-xl text-xs border border-slate-700 transition-colors whitespace-nowrap">
+            Atualizar KM
+          </button>
+        </form>
+      </div>
+
+      {/* REGISTRO DE NOVA MANUTENÇÃO */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
+        <h3 className="text-xs font-bold text-slate-100 mb-3 flex items-center gap-2">
+          <Plus className="w-4 h-4 text-emerald-400" /> Registrar Peça / Serviço
+        </h3>
+
+        <form onSubmit={handleAddMaintenance} className="space-y-3">
+          <div>
+            <label className="text-[10px] text-slate-400 mb-1 block">Peça / Serviço *</label>
+            <input 
+              type="text" 
+              placeholder="Ex: Troca de Óleo, Pneu Traseiro, Relação..." 
+              value={form.item} 
+              onChange={e => setForm({...form, item: e.target.value})} 
+              className={iosInputClass} 
+              required 
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-slate-400 mb-1 block">Valor (R$) *</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                placeholder="0.00" 
+                value={form.cost} 
+                onChange={e => setForm({...form, cost: e.target.value})} 
+                className={`${iosInputClass} font-bold text-rose-400`} 
+                required 
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 mb-1 block">Data *</label>
+              <input 
+                type="date" 
+                value={form.date} 
+                onChange={e => setForm({...form, date: e.target.value})} 
+                className={iosInputClass} 
+                required 
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] text-slate-400 mb-1 block">Categoria</label>
+            <select 
+              value={form.category} 
+              onChange={e => setForm({...form, category: e.target.value})} 
+              className={iosInputClass}
+            >
+              <option value="Manutenção Preventiva">Manutenção Preventiva</option>
+              <option value="Peça / Desgaste">Peça / Desgaste</option>
+              <option value="Reparo / Pneu">Reparo / Pneu</option>
+              <option value="Acessório / Ajuste">Acessório / Ajuste</option>
+            </select>
+          </div>
+
+          {/* ESTIMATIVA DE DURABILIDADE */}
+          <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+            <div>
+              <label className="text-[10px] text-slate-400 mb-1 block">Durabilidade (KM)</label>
+              <input 
+                type="number" 
+                placeholder="Ex: 3000 km" 
+                value={form.durabilityKm} 
+                onChange={e => setForm({...form, durabilityKm: e.target.value})} 
+                className={iosInputClass} 
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 mb-1 block">Durabilidade (Dias)</label>
+              <input 
+                type="number" 
+                placeholder="Ex: 180 dias" 
+                value={form.durabilityDays} 
+                onChange={e => setForm({...form, durabilityDays: e.target.value})} 
+                className={iosInputClass} 
+              />
+            </div>
+          </div>
+
+          <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-2.5 rounded-xl transition-all text-xs active:scale-95 shadow-md">
+            Salvar Manutenção
+          </button>
+        </form>
+      </div>
+
+      {/* HISTÓRICO DE MANUTENÇÕES */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
+        <h3 className="text-xs font-bold text-slate-200 mb-3 flex items-center justify-between">
+          <span className="flex items-center gap-1.5"><Bike className="w-4 h-4 text-emerald-400" /> Histórico de Peças e Serviços</span>
+          <span className="text-[10px] text-slate-400">{appData.maintenance.length} registros</span>
+        </h3>
+
+        {appData.maintenance.length === 0 ? (
+          <p className="text-xs text-slate-500 text-center py-6">Nenhuma manutenção cadastrada ainda.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {appData.maintenance.map((m) => {
+              const kmDrivenSince = appData.bikeKm - (m.installedAtKm || 0);
+              const isOverKm = m.durabilityKm && kmDrivenSince >= m.durabilityKm;
+
+              return (
+                <div key={m.id} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-start text-xs space-y-1">
+                  <div className="flex-1 pr-2">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-extrabold text-slate-100">{m.item}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded font-semibold">{m.category}</span>
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                      <span>Data: <strong className="text-slate-300">{formatDateBR(m.date)}</strong></span>
+                      {m.installedAtKm > 0 && <span>Instalado em: <strong className="text-slate-300">{m.installedAtKm} km</strong></span>}
+                    </div>
+
+                    {/* ESTIMATIVA & ALERTA DE DURABILIDADE */}
+                    {(m.durabilityKm || m.durabilityDays) && (
+                      <div className="mt-1.5 pt-1.5 border-t border-slate-900 flex flex-wrap items-center gap-2 text-[10px]">
+                        {m.durabilityKm && (
+                          <span className={`px-2 py-0.5 rounded font-bold ${isOverKm ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-900 text-slate-300'}`}>
+                            {kmDrivenSince} / {m.durabilityKm} km {isOverKm && '⚠️ Recomenda-se Troca!'}
+                          </span>
+                        )}
+                        {m.durabilityDays && (
+                          <span className="text-slate-400">
+                            Durabilidade est.: {m.durabilityDays} dias
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="font-black text-rose-400 text-sm">{formatBRL(m.cost)}</span>
+                    <button 
+                      onClick={() => handleDeleteRecord(m.id)}
+                      className="p-1 text-slate-500 hover:text-rose-400 transition-colors"
+                      title="Excluir"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PerfumesModule({ appData }) {
+  return (
+    <div className="space-y-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md text-center py-8">
+        <ShoppingBag className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+        <h3 className="text-sm font-bold text-slate-200">Parfums Selection</h3>
+        <p className="text-xs text-slate-400 mt-1">Fundo para compras de perfumes importados.</p>
+      </div>
+    </div>
+  );
+}
+
+function ReportsModule({ appData, runSelfTest, setAppData, setShowResetModal, setShowPwaModal }) {
+  return (
+    <div className="space-y-3">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md space-y-2.5">
+        <h3 className="text-xs font-bold text-slate-200 mb-2">Opções & Ferramentas</h3>
+        
+        <button onClick={() => setShowPwaModal(true)} className="w-full p-3 bg-slate-950 border border-slate-800 hover:border-emerald-500/50 rounded-xl flex items-center justify-between text-xs text-slate-200">
+          <span className="flex items-center gap-2"><Download className="w-4 h-4 text-emerald-400" /> Instalar no iPhone</span>
+          <ChevronRight className="w-4 h-4 text-slate-500" />
+        </button>
+
+        <button onClick={runSelfTest} className="w-full p-3 bg-slate-950 border border-slate-800 hover:border-teal-500/50 rounded-xl flex items-center justify-between text-xs text-slate-200">
+          <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-teal-400" /> Diagnóstico do Sistema</span>
+          <ChevronRight className="w-4 h-4 text-slate-500" />
+        </button>
+
+        <button onClick={() => setShowResetModal(true)} className="w-full p-3 bg-rose-950/20 border border-rose-500/30 rounded-xl flex items-center justify-between text-xs text-rose-300">
+          <span className="flex items-center gap-2"><RotateCcw className="w-4 h-4 text-rose-400" /> Zerar Todos os Dados</span>
+          <ChevronRight className="w-4 h-4 text-rose-500/50" />
+        </button>
+      </div>
+    </div>
+  );
+}
